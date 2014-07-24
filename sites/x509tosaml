@@ -1,0 +1,40 @@
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+	ServerName x509tosaml.aai.surfnet.nl
+	ServerAdmin jodi+x509tosaml@surfnet.nl
+
+	DocumentRoot /home/debian/x509tosaml/www
+
+	<Directory />
+		Options FollowSymLinks
+		AllowOverride None
+	</Directory>
+
+	<Directory /home/debian/x509tosaml>
+		Options Indexes FollowSymLinks MultiViews
+		AllowOverride All
+		#AllowOverride None
+		Order allow,deny
+		allow from all
+		#DirectoryIndex index.html index.php
+		#FallbackResource index.php
+	</Directory>
+
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+	LogLevel warn
+	CustomLog ${APACHE_LOG_DIR}/x509tosaml.log combined
+
+	SSLEngine on
+        SSLCertificateFile    /etc/ssl/certs/cert.pem
+        SSLCertificateKeyFile /etc/ssl/private/key.pem
+        SSLCertificateChainFile /etc/ssl/certs/chain.pem
+	SSLCACertificatePath /etc/ssl/certs/
+	SSLVerifyClient require
+	SSLVerifyDepth  10
+
+	<FilesMatch "\.(phtml|php)$">
+		SSLOptions +StdEnvVars
+	</FilesMatch>
+
+</VirtualHost>
+</IfModule>
