@@ -1,9 +1,9 @@
 <IfModule mod_ssl.c>
 <VirtualHost *:443>
-	ServerName x509tosaml.aai.surfnet.nl
-	ServerAdmin jodi+x509tosaml@surfnet.nl
+	ServerName x509tosaml.example.org
+	ServerAdmin admin@example.org
 
-	DocumentRoot /home/debian/x509tosaml/www
+	DocumentRoot /opt/x509tosaml/www
 
 	<Directory />
 		Options FollowSymLinks

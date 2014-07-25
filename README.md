@@ -3,31 +3,41 @@ x509tosaml
 
 Simple SAML 2.0 Identity Provider translating X.509 user certificates into SAML assertions
 
-Software
---------
+Software Dependencies
+---------------------
+
+This software is written in php, and needs web server software to run on.
+Apache web server is assumed.
+NTP is needed to provide timestamps in SAML statements.
 
 	sudo apt-get install apache2 php5
-	sudo apt-get install git
-	sudo apt-get install curl
+	sudo apt-get install ntp
 
-SSL
+SSL/TLS
 ---
+
+SSL/TLS  is required for client authentication using X.509 user certificates.
+
+For apache on a debian-based system:
 
 	sudo a2enmod ssl
 
 	sudo cp x509tosaml /etc/apache2/sites-available/
 	sudo a2ensite x509tosaml 
 
-Edit the file `/etc/apache2/sites-enabled/x509tosaml`
+You will need to provide a server certificate, its private key, and the CA chain.
+
+For apache on a debian based system, edit the file `/etc/apache2/sites-enabled/x509tosaml`
 
 	SSLCertificateFile    /etc/ssl/certs/cert.pem
 	SSLCertificateKeyFile /etc/ssl/private/key.key
 	SSLCertificateChainFile /etc/ssl/certs/chain.pem
 
-reload:
+After making changes, you will need to restart teh web server.
+
+For apache on a debian based system:
 
 	sudo service apache2 reload
-
 
 php
 ---
