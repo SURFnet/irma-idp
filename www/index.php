@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__.'/../vendor/autoload.php';
-include('../vendor/xmlseclibs/xmlseclibs.php');
 
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-function attributes() {
-    $dn = $_SERVER['SSL_CLIENT_S_DN'];
+// TODO fix
+date_default_timezone_set('Europe/Amsterdam');
+
+function dn_attributes($dn) {
     $attributes = array();
     foreach( explode('/',$dn) as $pair ) {
 	if( $pair=='' ) continue;
@@ -43,9 +44,9 @@ function utils_xml_sign($dom) {
                         array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N),
                         array('id_name' => 'ID'));
         $objKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA1, array('type'=>'private'));
-        $objKey->loadKey('key.pem', TRUE);
+        $objKey->loadKey('../key.pem', TRUE);
         $dsig->sign($objKey);
-        $cert = "cert.pem";
+        $cert = "../cert.pem";
         $contents = file_get_contents($cert);
         $dsig->add509Cert($contents, TRUE);
         $dsig->insertSignature($insert_into, $insert_before);
@@ -117,6 +118,9 @@ $app->get('/sso', function (Request $request) use ($app) {
     	'debug' => true,
     ));
 
+    $dn = isset($_SERVER['SSL_CLIENT_S_DN']) ? $_SERVER['SSL_CLIENT_S_DN'] : "CN=test";
+	// TODO nameidformat
+
     $saml_response = $twig->render('AuthnResponse.xml', array(
     	'ID' => $id,
     	'Issuer' => $issuer,
@@ -127,8 +131,8 @@ $app->get('/sso', function (Request $request) use ($app) {
 	'InResponseTo'	=> $requestID,
 	'NotBefore'	=> $notbefore,
 	'NotOnOrAfter'	=> $notbefore,
-	'Subject'	=> $_SERVER['SSL_CLIENT_S_DN'],	// TODO nameidformat
-	'attributes'	=> attributes(),
+	'Subject'	=> $dn,
+	'attributes'	=> dn_attributes($dn),
     ));
 
     $dom = new DOMDocument();

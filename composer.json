@@ -1,20 +1,7 @@
 {
     "require": {
-        "silex/silex": "~1.2",
-        "twig/twig": "1.*",
-        "xmlseclibs": "dev-master"
-    },
-    "repositories": [
-	{
-            "type":"package",
-            "package": {
-                "version":"dev-master",
-                "name":"xmlseclibs",
-                "dist": {
-                    "url":"https://xmlseclibs.googlecode.com/files/xmlseclibs-1.3.1.tar.gz",
-                    "type":"tar"
-                }
-            }
-	}
-    ]
+        "robrichards/xmlseclibs": "^1.3",
+        "silex/silex": "^2.0",
+        "twig/twig": "^1.33"
+    }
 }
