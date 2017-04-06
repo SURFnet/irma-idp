@@ -20,6 +20,7 @@
       - ntp
       - apache2
       - libapache2-mod-php
+      - php-dom
 
   # Apache
 
