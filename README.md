@@ -1,49 +1,84 @@
-x509tosaml
-==========
+# x509tosaml: SAML 2.0 IdP based on X.509
 
-Simple SAML 2.0 Identity Provider translating X.509 user certificates into SAML assertions
+Very simple SAML 2.0 Identity Provider (IdP) based on TLS client authentication.  The Subject DN from a users' personal X.509 certificate is mapped onto SAML attributes.
 
-Software Dependencies
----------------------
+This is an Open IdP, meaning that no SAML 2.0 SP metadata registration is necessary. 
 
-This software is written in php, and needs web server software to run on.
-Apache web server is assumed.
-NTP is needed to provide timestamps in SAML statements.
+Please note that this is not a conforming SAML implementation. It will not work with all SAML software implementations.
 
-	sudo apt-get install apache2 php5
-	sudo apt-get install ntp
 
-SSL/TLS
----
+# Installation
 
-SSL/TLS  is required for client authentication using X.509 user certificates.
+This software is implemented using PHP. It relies on a web server for handling TLS authentication. Currently, [Apache httpd](https://httpd.apache.org) is used, but it should also work with other web servers such as [nginx](http://nginx.org).
 
-For apache on a debian-based system:
+## Server
 
-	sudo a2enmod ssl
+Manual installation is straightforward, but easier using [Ansible](https://www.ansible.com). See the ansible [playbook](/ansible/playbook.yml). Note that the playbook file is written for [debian](https://www.debian.org)-based linux systems.
 
-	sudo cp x509tosaml /etc/apache2/sites-available/
-	sudo a2ensite x509tosaml 
+A [Vagrant](https://www.vagrantup.com) is supplied for an [Ubuntu 16.04 LTS](http://releases.ubuntu.com/16.04/) (Xenial Xerus) system to easily fire up a VM.
 
-You will need to provide a server certificate, its private key, and the CA chain.
+## Software
 
-For apache on a debian based system, edit the file `/etc/apache2/sites-enabled/x509tosaml`
+The Vagrant VM runs the PHP application directly from a shared folder (`/vagrant/www`), so no installation is necessary.
 
-	SSLCertificateFile    /etc/ssl/certs/cert.pem
-	SSLCertificateKeyFile /etc/ssl/private/key.key
-	SSLCertificateChainFile /etc/ssl/certs/chain.pem
+For other systems, the PHP server needs to be installed manually using [Composer](https://getcomposer.org). follow the instructions on their web site for a safe way to [install composer](https://getcomposer.org/download/).
 
-After making changes, you will need to restart teh web server.
+With composer installed, clone and install the PHP application at a suitable location (e.g. `/opt`) using:
 
-For apache on a debian based system:
+	$ git clone https://github.com/joostd/x509tosaml.git
+	$ cd x509tosaml
+	$ composer install
+	
+# Configuration
 
-	sudo service apache2 reload
+The server does not need any configuration to run. However, you will probably need to tweak configuration a bit for the server to be useful.
 
-php
----
+## Server certificate
 
-	curl -s https://getcomposer.org/installer | php
-	php composer.phar require "silex/silex:~1.2"
-	php composer.phar require "twig/twig:1.*"
-	php composer.phar install
-	php composer.phar update
+By default, the server is deployed using a self-signed certificate. You should replace this certificate with a "real" certificate trusted by current browsers.
+
+You can easily get a server certificate from [let's encrypt](https://letsencrypt.org). For Apache on Ubuntu 16.04 for instance, [use these certbot instructions](https://certbot.eff.org/#ubuntuxenial-apache).
+
+## SAML signing certificate
+
+By default, SAML assertions are unsigned. SAML Service Provicers will not trust unsigned assertions, so you will need to generate a SAML signing certificate, as follows:
+
+	$ cd samltox509
+	$ openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem  \
+		-subj '/CN=SAML signing' -days 3650 -out cert.pem
+	
+Also generate a DER-encoded version of this certificate (included in metadata):
+
+	$ openssl x509 -in cert.pem -outform der -out cert.crt
+	
+## Trusted Certification Authorities
+
+For TLS client authentication to work, your Apache webserver needs to have access to all intermediary or root certificates of the Certification Authorities (CAs) that issued client certificates. These are stored in `/etc/ssl/certs`.
+
+If you need to support certificates issued by additional CAs, you will need to add the certificates of those CAs to that directory. For instance, to support [TCS personal certificates](https://www.terena.org/activities/tcs/repository/), download the intermediary CA certificate and rebuild the hash-based index using:
+
+	$ wget https://www.terena.org/activities/tcs/repository-g3/TERENA_Personal_CA_3.pem
+	$ sudo cp TERENA_Personal_CA_3.pem /etc/ssl/certs
+	$ sudo /usr/bin/c_rehash
+
+  
+# Advanced use
+
+## Command line testing
+
+To generate a SAML authentication request message, a test script is included:
+
+	$ php test/request.php
+	
+This will print a URL to this IdP's SSOlocation (e.g. https://localhost/sso) with an encoded SAML AuthnRequest message.
+
+To automatically open this URL in your browser, use something like (on e.g. osx):
+
+	$ php test/request.php | xargs open -a Firefox
+
+To view the response: use
+
+	$ XPATH="//*[local-name()='input' and @type='hidden' and @name='SAMLResponse']/@value"
+	$ php test/request.php | xargs curl -sk | xmllint --xpath "$XPATH" - | cut -d= -f2- | xargs | base64 -D | xmllint --format -
+
+Use `curl`'s `-E` flag to supply a personal certificate.

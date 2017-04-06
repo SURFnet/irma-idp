@@ -1,6 +1,7 @@
 *.tar
 *.pem
 *.key
+*.crt
 
 ### Ansible ###
 ansible/playbook.retry 
