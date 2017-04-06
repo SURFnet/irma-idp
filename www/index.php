@@ -4,12 +4,16 @@ require_once __DIR__.'/../vendor/autoload.php';
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+define("KEYFILE", "../key.pem");
+define("CERTFILE", "../cert.pem");      // PEM encoded version
+define("CERTFILE_DER", "../cert.crt"); // DER encoded version
+
 // TODO fix
 date_default_timezone_set('Europe/Amsterdam');
 
 function dn_attributes($dn) {
     $attributes = array();
-    foreach( explode('/',$dn) as $pair ) {
+    foreach( explode(',',$dn) as $pair ) {
 	if( $pair=='' ) continue;
 	list($k, $v) = explode('=',$pair);
 	$attributes[$k] = $v;
@@ -31,7 +35,7 @@ function utils_xml_create($xml, $preserveWhiteSpace = FALSE) {
         return $dom;
 }
 
-function utils_xml_sign($dom) {
+function utils_xml_sign($dom, $keyfile, $certfile) {
         // remove whitespace without breaking signature
         $dom = utils_xml_create($dom->saveXML(), TRUE);
         $dsig = new XMLSecurityDSig();
@@ -44,10 +48,9 @@ function utils_xml_sign($dom) {
                         array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N),
                         array('id_name' => 'ID'));
         $objKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA1, array('type'=>'private'));
-        $objKey->loadKey('../key.pem', TRUE);
+        $objKey->loadKey($keyfile, TRUE);
         $dsig->sign($objKey);
-        $cert = "../cert.pem";
-        $contents = file_get_contents($cert);
+        $contents = file_get_contents($certfile);
         $dsig->add509Cert($contents, TRUE);
         $dsig->insertSignature($insert_into, $insert_before);
         return $dom;
@@ -67,6 +70,9 @@ $app->get('/', function (Request $request) use ($app) {
     return "This is a SAML IDP<br/>See also the SAML 2.0 <a href='$url'>Metadata</a>";
 });
 
+$certfile = '../cert.pem';
+$keyfile = '../key.pem';
+
 ########## SAML ##########
 
 # SAML 2.0 Metadata
@@ -77,9 +83,12 @@ $app->get('/metadata', function (Request $request) use ($app) {
     	'debug' => true,
     ));
     $base = $request->getUriForPath('/');
+    $contents = file_get_contents(CERTFILE_DER);
+    $certdata = base64_encode($contents);
     $metadata = $twig->render('metadata.xml', array(
     	'entityID' => $base . "metadata",	// convention: use metadata URL as entity ID
     	'Location' => $base . "sso",
+        'X509Certificate' => $certdata,
     ));
     $response = new Response($metadata);
     $response->headers->set('Content-Type', 'text/xml');
@@ -120,6 +129,7 @@ $app->get('/sso', function (Request $request) use ($app) {
 
     $dn = isset($_SERVER['SSL_CLIENT_S_DN']) ? $_SERVER['SSL_CLIENT_S_DN'] : "CN=test";
 	// TODO nameidformat
+    $attributes = dn_attributes($dn);
 
     $saml_response = $twig->render('AuthnResponse.xml', array(
     	'ID' => $id,
@@ -132,22 +142,25 @@ $app->get('/sso', function (Request $request) use ($app) {
 	'NotBefore'	=> $notbefore,
 	'NotOnOrAfter'	=> $notbefore,
 	'Subject'	=> $dn,
-	'attributes'	=> dn_attributes($dn),
+	'attributes'	=> $attributes,
     ));
 
     $dom = new DOMDocument();
     $dom->preserveWhiteSpace = FALSE;
     $dom->loadXML($saml_response);
     $dom->formatOutput = TRUE;
-    $response = utils_xml_sign($dom);
+    $response = utils_xml_sign($dom, KEYFILE, CERTFILE);
     $saml_response = $response->saveXML();
+    $server = parse_url($acs_url, PHP_URL_HOST);
 
     $params = array();
     $params['action'] = $acs_url;
     $params['SAMLResponse'] = base64_encode($saml_response);
     if ($relay_state !== NULL) {
-  	$params['RelayState'] = $relay_state;
+        $params['RelayState'] = $relay_state;
     }
+    $params['Server'] = $server;
+    $params['Attributes'] = $attributes;
     $form = $twig->render('form.html', $params);
     return $form;
 });

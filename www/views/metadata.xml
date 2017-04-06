@@ -1,10 +1,12 @@
-<EntityDescriptor
-	xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
-	entityID="{{entityID}}">
-  <IDPSSODescriptor
-	protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
-    <SingleSignOnService
-	Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-	Location="{{Location}}"/>
-  </IDPSSODescriptor>
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="{{entityID}}">
+    <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+        <KeyDescriptor use="signing">
+		    <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                <ds:X509Data>
+                    <ds:X509Certificate>{{ X509Certificate }}</ds:X509Certificate>
+              </ds:X509Data>
+            </ds:KeyInfo>
+        </KeyDescriptor>
+	    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="{{Location}}"/>
+    </IDPSSODescriptor>
 </EntityDescriptor>
