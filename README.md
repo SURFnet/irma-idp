@@ -21,13 +21,16 @@ A [Vagrant](https://www.vagrantup.com) is supplied for an [Ubuntu 16.04 LTS](htt
 
 The Vagrant VM runs the PHP application directly from a shared folder (`/vagrant/www`), so no installation is necessary.
 
-For other systems, the PHP server needs to be installed manually using [Composer](https://getcomposer.org). follow the instructions on their web site for a safe way to [install composer](https://getcomposer.org/download/).
+For other systems, the PHP server needs to be installed manually using [Composer](https://getcomposer.org). follow the instructions on their web site for a safe way to [install composer](https://getcomposer.org/download/). On Ubuntu:
+
+	$ apt-get install git php-zip composer
 
 With composer installed, clone and install the PHP application at a suitable location (e.g. `/opt`) using:
 
 	$ git clone https://github.com/joostd/x509tosaml.git
 	$ cd x509tosaml
 	$ composer install
+	
 	
 # Configuration
 
@@ -61,7 +64,24 @@ If you need to support certificates issued by additional CAs, you will need to a
 	$ sudo cp TERENA_Personal_CA_3.pem /etc/ssl/certs
 	$ sudo /usr/bin/c_rehash
 
-  
+# Updates
+
+To update the PHP application from its git repository:
+
+	$ git pull
+
+Then update its dependencies:
+
+	$ composer update
+	
+# Security Considerations
+
+Note that the provided ansible scripts are intended for automatic deployment of a test instance and are therefore minimal. Make sure you configure your server securely when connecting to the Internet. For instance, consider activating automatic updates. On Ubuntu:
+
+	$ sudo apt-get install unattended-upgrades
+
+Als note that the PHP application and its dependencies have to be upgraded manually.
+
 # Advanced use
 
 ## Command line testing

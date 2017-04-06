@@ -5,9 +5,6 @@
   gather_facts: False
 
   vars:
-    hostname: x509tosaml
-    domain: example.org
-    fqdn: "{{ hostname }}.{{ domain }}"
     #docroot: /opt/x509tosaml/www
     docroot: /vagrant/www
 
@@ -35,28 +32,28 @@
     - restart apache2
 
   - name: create virtual host file
-    template: src=apache2/vhost.conf dest=/etc/apache2/sites-available/{{ fqdn }}.conf
+    template: src=apache2/vhost.conf dest=/etc/apache2/sites-available/{{ inventory_hostname }}.conf
     notify:
     - restart apache2
 
   - name: create key pair
-    command: openssl genrsa -out /etc/ssl/private/{{ fqdn }}.pem 2048
+    command: openssl genrsa -out /etc/ssl/private/{{ inventory_hostname }}.pem 2048
     args:
-      creates: /etc/ssl/private/{{ fqdn }}.pem
+      creates: /etc/ssl/private/{{ inventory_hostname }}.pem
     notify:
     - restart apache2
 
   - name: create self-signed certificate
-    command: openssl req -new -x509 -subj '/CN={{ fqdn }}' -key /etc/ssl/private/{{ fqdn }}.pem -out /etc/ssl/certs/{{ fqdn }}.pem -days 3650
+    command: openssl req -new -x509 -subj '/CN={{ inventory_hostname }}' -key /etc/ssl/private/{{ inventory_hostname }}.pem -out /etc/ssl/certs/{{ inventory_hostname }}.pem -days 3650
     args:
-      creates: /etc/ssl/certs/{{ fqdn }}.pem
+      creates: /etc/ssl/certs/{{ inventory_hostname }}.pem
     notify:
     - restart apache2
 
-  - name: a2ensite {{ fqdn }}
-    command: a2ensite {{ fqdn }}
+  - name: a2ensite {{ inventory_hostname }}
+    command: a2ensite {{ inventory_hostname }}
     args:
-      creates: /etc/apache2/sites-enabled/{{ fqdn }}.conf
+      creates: /etc/apache2/sites-enabled/{{ inventory_hostname }}.conf
     notify:
     - restart apache2
 
