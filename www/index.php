@@ -35,25 +35,26 @@ function utils_xml_create($xml, $preserveWhiteSpace = FALSE) {
         return $dom;
 }
 
-function utils_xml_sign($dom, $keyfile, $certfile) {
-        // remove whitespace without breaking signature
-        $dom = utils_xml_create($dom->saveXML(), TRUE);
-        $dsig = new XMLSecurityDSig();
-        $dsig->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);
-        $root = $dom->getElementsByTagName('Assertion')->item(0);
-        assert('$root instanceof DOMElement');
-        $insert_into = $dom->getElementsByTagName('Assertion')->item(0);
-        $insert_before = $insert_into->getElementsByTagName('Subject')->item(0);
-        $dsig->addReferenceList(array($root), XMLSecurityDSig::SHA1,
-                        array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N),
-                        array('id_name' => 'ID'));
-        $objKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA1, array('type'=>'private'));
-        $objKey->loadKey($keyfile, TRUE);
-        $dsig->sign($objKey);
-        $contents = file_get_contents($certfile);
-        $dsig->add509Cert($contents, TRUE);
-        $dsig->insertSignature($insert_into, $insert_before);
-        return $dom;
+function utils_xml_sign($dom, $key, $cert = false)
+{
+    // remove whitespace without breaking signature
+    $dom = utils_xml_create($dom->saveXML(), TRUE);
+    $dsig = new XMLSecurityDSig();
+    $dsig->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);
+    $root = $dom->getElementsByTagName('Assertion')->item(0);
+    assert('$root instanceof DOMElement');
+    $insert_into = $dom->getElementsByTagName('Assertion')->item(0);
+    $insert_before = $insert_into->getElementsByTagName('Subject')->item(0);
+    $dsig->addReferenceList(array($root), XMLSecurityDSig::SHA1,
+        array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N),
+        array('id_name' => 'ID'));
+    $objKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA1, array('type' => 'private'));
+    $objKey->loadKey($key);
+    $dsig->sign($objKey);
+    if ($cert)
+        $dsig->add509Cert($cert, TRUE);
+    $dsig->insertSignature($insert_into, $insert_before);
+    return $dom;
 }
 
 $app = new Silex\Application(); 
@@ -84,7 +85,7 @@ $app->get('/metadata', function (Request $request) use ($app) {
     ));
     $base = $request->getUriForPath('/');
     $contents = file_get_contents(CERTFILE_DER);
-    $certdata = base64_encode($contents);
+    $certdata = $contents ? base64_encode($contents) : null;
     $metadata = $twig->render('metadata.xml', array(
     	'entityID' => $base . "metadata",	// convention: use metadata URL as entity ID
     	'Location' => $base . "sso",
@@ -136,21 +137,24 @@ $app->get('/sso', function (Request $request) use ($app) {
     	'Issuer' => $issuer,
     	'IssueInstant' => $now,
     	'Destination' => $destination,
-	'Assertionid'	=> 'TODO',
-	'Audience'	=> 'TODO',
-	'InResponseTo'	=> $requestID,
-	'NotBefore'	=> $notbefore,
-	'NotOnOrAfter'	=> $notbefore,
-	'Subject'	=> $dn,
-	'attributes'	=> $attributes,
+	    'Assertionid'	=> 'TODO',
+	    'Audience'	=> 'TODO',
+	    'InResponseTo'	=> $requestID,
+	    'NotBefore'	=> $notbefore,
+	    'NotOnOrAfter'	=> $notonorafter,
+	    'Subject'	=> $dn,
+	    'attributes'	=> $attributes,
     ));
 
     $dom = new DOMDocument();
     $dom->preserveWhiteSpace = FALSE;
     $dom->loadXML($saml_response);
     $dom->formatOutput = TRUE;
-    $response = utils_xml_sign($dom, KEYFILE, CERTFILE);
-    $saml_response = $response->saveXML();
+    $cert = file_get_contents(CERTFILE);
+    $key = file_get_contents(KEYFILE);
+    if( $key )
+        $dom = utils_xml_sign($dom, $key, $cert);
+    $saml_response = $dom->saveXML();
     $server = parse_url($acs_url, PHP_URL_HOST);
 
     $params = array();
