@@ -21,12 +21,6 @@ function dn_attributes($dn) {
     return $attributes;
 }
 
-function xpath( $query, $dom ) {
-    $xpath = new DOMXPath($dom);
-    $xpath->registerNamespace('samlp', "urn:oasis:names:tc:SAML:2.0:protocol" );
-    return $xpath->evaluate($query, $dom);
-}
-
 function utils_xml_create($xml, $preserveWhiteSpace = FALSE) {
         $dom = new DOMDocument();
         $dom->preserveWhiteSpace = $preserveWhiteSpace;
@@ -105,13 +99,22 @@ $app->get('/sso', function (Request $request) use ($app) {
     $dom->loadXML($saml_request);
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('samlp', "urn:oasis:names:tc:SAML:2.0:protocol" );
+    $xpath->registerNamespace('saml', "urn:oasis:names:tc:SAML:2.0:assertion" );
+    // ACS URL
     $query = "string(/samlp:AuthnRequest/@AssertionConsumerServiceURL)";
     $acs_url = $xpath->evaluate($query, $dom);
     if (!$acs_url) {
       throw new Exception('Could not locate AssertionConsumerServiceURL attribute.');
     }
+    // Request ID
     $query = "string(/samlp:AuthnRequest/@ID)";
-    $requestID = xpath($query, $dom);
+    $requestID = $xpath->evaluate($query, $dom);
+    // Audience
+    $query = "string(/samlp:AuthnRequest/saml:Issuer)";
+    $audience = $xpath->evaluate($query, $dom);
+    if (!$audience) {
+        throw new Exception('Could not locate Issuer element.');
+    }
 
     # send SAML response
     $base = $request->getUriForPath('/');
@@ -138,7 +141,7 @@ $app->get('/sso', function (Request $request) use ($app) {
     	'IssueInstant' => $now,
     	'Destination' => $destination,
 	    'Assertionid'	=> 'TODO',
-	    'Audience'	=> 'TODO',
+	    'Audience'	=> $audience,
 	    'InResponseTo'	=> $requestID,
 	    'NotBefore'	=> $notbefore,
 	    'NotOnOrAfter'	=> $notonorafter,
