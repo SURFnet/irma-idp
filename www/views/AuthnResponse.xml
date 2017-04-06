@@ -14,7 +14,7 @@
  <saml:Assertion Version="2.0" ID="{{Assertionid}}" IssueInstant="{{IssueInstant}}">
   <saml:Issuer>{{Issuer}}</saml:Issuer>
    <saml:Subject>
-    <saml:NameID Format='urn:oasis:names:tc:SAML:2.0:nameid-format:persistent'>{{Subject}}</saml:NameID>
+    <saml:NameID Format='urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName'>{{Subject}}</saml:NameID>
     <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
      <saml:SubjectConfirmationData NotOnOrAfter="{{NotOnOrAfter}}" InResponseTo="{{InResponseTo}}" Recipient="{{Destination}}" /></saml:SubjectConfirmation>
    </saml:Subject>
