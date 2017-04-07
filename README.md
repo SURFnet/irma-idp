@@ -84,6 +84,23 @@ Als note that the PHP application and its dependencies have to be upgraded manua
 
 # Advanced use
 
+## Testing with a Service Provider
+
+Note that the X.509 IdP does not need to be configered with SP metadata - it will accept authentication requests from any SP. The SP on the other hand will probably not accept any IdP, so if it wants to accept the X.509 IdP, it needs to import its metadata.
+
+For example, when using [simpleSAMLphp](http://simplesamlphp.org) to implement the SP, one could use the following configuration (located in the file `metadata/saml20-remote-idp.php`):
+
+	$metadata['https://x509idp.example.org/metadata'] = array (
+	  'entityid' => 'https://x509idp.example.org/metadata',
+	  'name' => 'x509 IdP',
+	  'SingleSignOnService' => 'https://x509idp.example.org/sso',
+	  'certData' => 'MII...o=',
+	);
+	
+`certData` contains the signing certificate generated for the IdP in base64 encoding. To generate this data, you can use:
+
+	$ base64 < cert.crt
+
 ## Command line testing
 
 To generate a SAML authentication request message, a test script is included:
