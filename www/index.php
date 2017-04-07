@@ -8,17 +8,51 @@ define("KEYFILE", "../key.pem");
 define("CERTFILE", "../cert.pem");      // PEM encoded version
 define("CERTFILE_DER", "../cert.crt"); // DER encoded version
 
+define("NAMEIDFORMAT", "urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName");
+define("AUTHNCONTEXTCLASSREF", "urn:oasis:names:tc:SAML:2.0:ac:classes:X509");
+
 // TODO fix
 date_default_timezone_set('Europe/Amsterdam');
 
 function dn_attributes($dn) {
     $attributes = array();
     foreach( explode(',',$dn) as $pair ) {
-	if( $pair=='' ) continue;
-	list($k, $v) = explode('=',$pair);
-	$attributes[$k] = $v;
+	    if( $pair=='' ) continue;
+        list($k, $v) = explode('=',$pair);
+        $attributes[$k] = $v;
     }
     return $attributes;
+}
+
+function samlResponse($issuer, $destination, $audience, $requestID, $dn) {
+
+    $now = gmdate("Y-m-d\TH:i:s\Z", time());
+    $id = "_"; for ($i = 0; $i < 42; $i++ ) $id .= dechex( rand(0,15) ); // leave out?
+    $notonorafter = gmdate("Y-m-d\TH:i:s\Z", time() + 60 * 5);
+    $notbefore = gmdate("Y-m-d\TH:i:s\Z", time() - 30);
+
+    $attributes = dn_attributes($dn);
+
+    $loader = new Twig_Loader_Filesystem('views');
+    $twig = new Twig_Environment($loader, array(
+        'debug' => true,
+    ));
+
+    return $twig->render('AuthnResponse.xml', array(
+        'ID' => $id,
+        'Issuer' => $issuer,
+        'IssueInstant' => $now,
+        'Destination' => $destination,
+        'Assertionid'	=> 'TODO',
+        'Audience'	=> $audience,
+        'InResponseTo'	=> $requestID,
+        'NotBefore'	=> $notbefore,
+        'NotOnOrAfter'	=> $notonorafter,
+        'NameIDFormat' => NAMEIDFORMAT,
+        'Subject'	=> $dn,
+        'AuthnContextClassRef' => AUTHNCONTEXTCLASSREF,
+        'attributes'	=> $attributes,
+    ));
 }
 
 function utils_xml_create($xml, $preserveWhiteSpace = FALSE) {
@@ -106,69 +140,52 @@ $app->get('/sso', function (Request $request) use ($app) {
     if (!$acs_url) {
       throw new Exception('Could not locate AssertionConsumerServiceURL attribute.');
     }
+    // TODO validate $acs_url
+
     // Request ID
     $query = "string(/samlp:AuthnRequest/@ID)";
     $requestID = $xpath->evaluate($query, $dom);
+    // TODO validate $requestID
+
     // Audience
     $query = "string(/samlp:AuthnRequest/saml:Issuer)";
     $audience = $xpath->evaluate($query, $dom);
     if (!$audience) {
         throw new Exception('Could not locate Issuer element.');
     }
+    // TODO validate $audience
 
     # send SAML response
     $base = $request->getUriForPath('/');
     $issuer = $base . 'metadata';	// convention
     # remote SP
     $destination = $acs_url; // TODO
-    $now = gmdate("Y-m-d\TH:i:s\Z", time());
-    $id = "_"; for ($i = 0; $i < 42; $i++ ) $id .= dechex( rand(0,15) );
-    $notonorafter = gmdate("Y-m-d\TH:i:s\Z", time() + 60 * 5);
-    $notbefore = gmdate("Y-m-d\TH:i:s\Z", time() - 30);
-
-    $loader = new Twig_Loader_Filesystem('views');
-    $twig = new Twig_Environment($loader, array(
-    	'debug' => true,
-    ));
 
     $dn = isset($_SERVER['SSL_CLIENT_S_DN']) ? $_SERVER['SSL_CLIENT_S_DN'] : "CN=test";
-	// TODO nameidformat
-    $attributes = dn_attributes($dn);
 
-    $saml_response = $twig->render('AuthnResponse.xml', array(
-    	'ID' => $id,
-    	'Issuer' => $issuer,
-    	'IssueInstant' => $now,
-    	'Destination' => $destination,
-	    'Assertionid'	=> 'TODO',
-	    'Audience'	=> $audience,
-	    'InResponseTo'	=> $requestID,
-	    'NotBefore'	=> $notbefore,
-	    'NotOnOrAfter'	=> $notonorafter,
-	    'Subject'	=> $dn,
-	    'attributes'	=> $attributes,
-    ));
+    $saml_response = samlResponse($issuer, $destination, $audience, $requestID, $dn);
 
-    $dom = new DOMDocument();
-    $dom->preserveWhiteSpace = FALSE;
-    $dom->loadXML($saml_response);
-    $dom->formatOutput = TRUE;
     $cert = file_get_contents(CERTFILE);
     $key = file_get_contents(KEYFILE);
-    if( $key )
+    if( $key ) {
+        $dom = new DOMDocument();
+        $dom->preserveWhiteSpace = FALSE;
+        $dom->loadXML($saml_response);
+        $dom->formatOutput = TRUE;
         $dom = utils_xml_sign($dom, $key, $cert);
-    $saml_response = $dom->saveXML();
-    $server = parse_url($acs_url, PHP_URL_HOST);
-
-    $params = array();
-    $params['action'] = $acs_url;
-    $params['SAMLResponse'] = base64_encode($saml_response);
-    if ($relay_state !== NULL) {
-        $params['RelayState'] = $relay_state;
+        $saml_response = $dom->saveXML();
     }
-    $params['Server'] = $server;
-    $params['Attributes'] = $attributes;
-    $form = $twig->render('form.html', $params);
+
+    $server = parse_url($acs_url, PHP_URL_HOST);
+    // TODO validate server
+
+    $form = $twig->render('form.html', array(
+        'action' => $acs_url,
+        'server' => $server,
+        'RelayState' => $relay_state,
+        'Attributes' => $attributes,
+        'SAMLResponse' => base64_encode($saml_response),
+    ));
     return $form;
 });
 

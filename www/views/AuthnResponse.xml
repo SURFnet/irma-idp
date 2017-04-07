@@ -4,8 +4,8 @@
         ID='{{ID}}'
         InResponseTo="{{InResponseTo}}"
         Version="2.0"
-          IssueInstant='{{IssueInstant}}'
-          Destination='{{Destination}}'
+        IssueInstant='{{IssueInstant}}'
+        Destination='{{Destination}}'
 >
  <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{{Issuer}}</saml:Issuer>
  <samlp:Status xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
@@ -14,7 +14,7 @@
  <saml:Assertion Version="2.0" ID="{{Assertionid}}" IssueInstant="{{IssueInstant}}">
   <saml:Issuer>{{Issuer}}</saml:Issuer>
    <saml:Subject>
-    <saml:NameID Format='urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName'>{{Subject}}</saml:NameID>
+    <saml:NameID Format='{{NameIDFormat}}'>{{Subject}}</saml:NameID>
     <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
      <saml:SubjectConfirmationData NotOnOrAfter="{{NotOnOrAfter}}" InResponseTo="{{InResponseTo}}" Recipient="{{Destination}}" /></saml:SubjectConfirmation>
    </saml:Subject>
@@ -24,10 +24,9 @@
     </saml:AudienceRestriction>
    </saml:Conditions>
 
-  <saml:AuthnStatement AuthnInstant="{{IssueInstant}}" SessionIndex="1"
-  >
+  <saml:AuthnStatement AuthnInstant="{{IssueInstant}}" SessionIndex="1">
    <saml:AuthnContext>
-    <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef>
+    <saml:AuthnContextClassRef>{{AuthnContextClassRef}}</saml:AuthnContextClassRef>
    </saml:AuthnContext>
   </saml:AuthnStatement>
 
