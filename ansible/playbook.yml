@@ -5,8 +5,7 @@
   gather_facts: False
 
   vars:
-    #docroot: /opt/x509tosaml/www
-    docroot: /vagrant/www
+    docroot: /opt/x509tosaml/www
 
   remote_user: vagrant
 
