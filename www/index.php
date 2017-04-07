@@ -4,6 +4,7 @@ require_once __DIR__.'/../vendor/autoload.php';
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+define("DEBUG", false);
 define("KEYFILE", "../key.pem");
 define("CERTFILE", "../cert.pem");      // PEM encoded version
 define("CERTFILE_DER", "../cert.crt"); // DER encoded version
@@ -24,16 +25,13 @@ function dn_attributes($dn) {
 }
 
 function samlResponse($issuer, $destination, $audience, $requestID, $dn, $attributes) {
-
+    $id = "_"; for ($i = 0; $i < 42; $i++ ) $id .= dechex( rand(0,15) );
     $now = gmdate("Y-m-d\TH:i:s\Z", time());
-    $id = "_"; for ($i = 0; $i < 42; $i++ ) $id .= dechex( rand(0,15) ); // leave out?
     $notonorafter = gmdate("Y-m-d\TH:i:s\Z", time() + 60 * 5);
     $notbefore = gmdate("Y-m-d\TH:i:s\Z", time() - 30);
 
     $loader = new Twig_Loader_Filesystem('views');
-    $twig = new Twig_Environment($loader, array(
-        'debug' => true,
-    ));
+    $twig = new Twig_Environment($loader);
 
     return $twig->render('AuthnResponse.xml', array(
         'ID' => $id,
@@ -76,10 +74,9 @@ function sign($response, $key, $cert) {
 }
 
 $app = new Silex\Application();
-$app['debug'] = true;
+$app['debug'] = DEBUG;
 
 $app->register(new Silex\Provider\SessionServiceProvider());
-
 $app->register(new Silex\Provider\TwigServiceProvider(), array(
     'twig.path' => __DIR__.'/views',
 ));
@@ -109,7 +106,7 @@ $app->get('/metadata', function (Request $request) use ($app) {
 
 # receive SAML request - assume HTTP-Redirect binding
 $app->get('/sso', function (Request $request) use ($app) {
-    $relay_state = $request->get('RelayState'); // TODO
+    $relay_state = $request->get('RelayState'); // TODO sanitize
     $saml_request = $request->get('SAMLRequest');
     $saml_request = gzinflate(base64_decode($saml_request));
     $dom = new DOMDocument();
@@ -117,7 +114,7 @@ $app->get('/sso', function (Request $request) use ($app) {
     $previous = libxml_disable_entity_loader(true);
     $dom->loadXML($saml_request);
     libxml_disable_entity_loader($previous);
-    
+
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('samlp', "urn:oasis:names:tc:SAML:2.0:protocol" );
     $xpath->registerNamespace('saml', "urn:oasis:names:tc:SAML:2.0:assertion" );
@@ -163,19 +160,13 @@ $app->get('/sso', function (Request $request) use ($app) {
     if( $key )
         $saml_response = sign($saml_response, $key, $cert);
 
-    $loader = new Twig_Loader_Filesystem('views');
-    $twig = new Twig_Environment($loader, array(
-        'debug' => true,
-    ));
-
-    $form = $twig->render('form.html', array(
+    return $app['twig']->render('form.html', array(
         'action' => $acs_url,
         'server' => $server,
         'RelayState' => $relay_state,
         'Attributes' => $attributes,
         'SAMLResponse' => base64_encode($saml_response),
     ));
-    return $form;
 });
 
 $app->run(); 
