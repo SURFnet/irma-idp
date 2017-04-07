@@ -152,6 +152,8 @@ $app->get('/sso', function (Request $request) use ($app) {
 
     $dn = isset($_SERVER['SSL_CLIENT_S_DN']) ? $_SERVER['SSL_CLIENT_S_DN'] : "CN=test";
     $attributes = dn_attributes($dn);
+    if( array_key_exists('SSL_CLIENT_SAN_Email_0', $_SERVER) )
+        $attributes['mail'] = $_SERVER['SSL_CLIENT_SAN_Email_0'];
 
     $saml_response = samlResponse($issuer, $destination, $audience, $requestID, $dn, $attributes);
 
