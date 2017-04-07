@@ -179,6 +179,11 @@ $app->get('/sso', function (Request $request) use ($app) {
     $server = parse_url($acs_url, PHP_URL_HOST);
     // TODO validate server
 
+    $loader = new Twig_Loader_Filesystem('views');
+    $twig = new Twig_Environment($loader, array(
+        'debug' => true,
+    ));
+
     $form = $twig->render('form.html', array(
         'action' => $acs_url,
         'server' => $server,
