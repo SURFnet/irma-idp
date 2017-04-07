@@ -11,8 +11,7 @@ define("CERTFILE_DER", "../cert.crt"); // DER encoded version
 define("NAMEIDFORMAT", "urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName");
 define("AUTHNCONTEXTCLASSREF", "urn:oasis:names:tc:SAML:2.0:ac:classes:X509");
 
-// TODO fix
-date_default_timezone_set('Europe/Amsterdam');
+date_default_timezone_set('UTC');
 
 function dn_attributes($dn) {
     $attributes = array();
@@ -90,13 +89,6 @@ $app->get('/', function (Request $request) use ($app) {
     return "This is a SAML IDP<br/>See also the SAML 2.0 <a href='$url'>Metadata</a>";
 });
 
-$certfile = '../cert.pem';
-$keyfile = '../key.pem';
-
-########## SAML ##########
-
-# SAML 2.0 Metadata
-
 $app->get('/metadata', function (Request $request) use ($app) {
     $loader = new Twig_Loader_Filesystem('views');
     $twig = new Twig_Environment($loader, array(
@@ -117,11 +109,11 @@ $app->get('/metadata', function (Request $request) use ($app) {
 
 # receive SAML request - assume HTTP-Redirect binding
 $app->get('/sso', function (Request $request) use ($app) {
-    $relay_state = $request->get('RelayState');
+    $relay_state = $request->get('RelayState'); // TODO
     $saml_request = $request->get('SAMLRequest');
     $saml_request = gzinflate(base64_decode($saml_request));
     $dom = new DOMDocument();
-    $dom->loadXML($saml_request);
+    $dom->loadXML($saml_request); // TODO
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('samlp', "urn:oasis:names:tc:SAML:2.0:protocol" );
     $xpath->registerNamespace('saml', "urn:oasis:names:tc:SAML:2.0:assertion" );
@@ -131,12 +123,16 @@ $app->get('/sso', function (Request $request) use ($app) {
     if (!$acs_url) {
       throw new Exception('Could not locate AssertionConsumerServiceURL attribute.');
     }
-    // TODO validate $acs_url
+
+    if( $acs_url != filter_var($acs_url, FILTER_VALIDATE_URL))
+        throw new Exception(sprintf("illegal ACS URL '%s'", $acs_url));
+    $server = parse_url($acs_url, PHP_URL_HOST);
 
     // Request ID
     $query = "string(/samlp:AuthnRequest/@ID)";
     $requestID = $xpath->evaluate($query, $dom);
-    // TODO validate $requestID
+    if( FALSE === preg_match("/^[a-zA-Z_][0-9a-zA-Z._-]*$/", $requestID) )
+        throw new Exception(sprintf("illegal ID '%s'", $requestID));
 
     // Audience
     $query = "string(/samlp:AuthnRequest/saml:Issuer)";
@@ -144,13 +140,14 @@ $app->get('/sso', function (Request $request) use ($app) {
     if (!$audience) {
         throw new Exception('Could not locate Issuer element.');
     }
-    // TODO validate $audience
+    if( $audience != filter_var($audience, FILTER_VALIDATE_URL))
+        throw new Exception(sprintf("illegal issuer  '%s'", $audience));
 
     # send SAML response
     $base = $request->getUriForPath('/');
     $issuer = $base . 'metadata';	// convention
     # remote SP
-    $destination = $acs_url; // TODO
+    $destination = $acs_url;
 
     $dn = isset($_SERVER['SSL_CLIENT_S_DN']) ? $_SERVER['SSL_CLIENT_S_DN'] : "CN=test";
     $attributes = dn_attributes($dn);
@@ -161,9 +158,6 @@ $app->get('/sso', function (Request $request) use ($app) {
     $key = file_get_contents(KEYFILE);
     if( $key )
         $saml_response = sign($saml_response, $key, $cert);
-
-    $server = parse_url($acs_url, PHP_URL_HOST);
-    // TODO validate server
 
     $loader = new Twig_Loader_Filesystem('views');
     $twig = new Twig_Environment($loader, array(
