@@ -4,7 +4,7 @@ Very simple SAML 2.0 Identity Provider (IdP) based on TLS client authentication.
 
 This is an Open IdP, meaning that no SAML 2.0 SP metadata registration is necessary. 
 
-Please note that this is not a conforming SAML implementation. It will not work with all SAML software implementations.
+Please note that this is not a conforming SAML implementation. It will not work with all SAML software implementations. It has been tested with [simpleSAMLphp](http://simplesamlphp.org).
 
 
 # Installation
