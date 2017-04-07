@@ -24,14 +24,12 @@ function dn_attributes($dn) {
     return $attributes;
 }
 
-function samlResponse($issuer, $destination, $audience, $requestID, $dn) {
+function samlResponse($issuer, $destination, $audience, $requestID, $dn, $attributes) {
 
     $now = gmdate("Y-m-d\TH:i:s\Z", time());
     $id = "_"; for ($i = 0; $i < 42; $i++ ) $id .= dechex( rand(0,15) ); // leave out?
     $notonorafter = gmdate("Y-m-d\TH:i:s\Z", time() + 60 * 5);
     $notbefore = gmdate("Y-m-d\TH:i:s\Z", time() - 30);
-
-    $attributes = dn_attributes($dn);
 
     $loader = new Twig_Loader_Filesystem('views');
     $twig = new Twig_Environment($loader, array(
@@ -162,8 +160,9 @@ $app->get('/sso', function (Request $request) use ($app) {
     $destination = $acs_url; // TODO
 
     $dn = isset($_SERVER['SSL_CLIENT_S_DN']) ? $_SERVER['SSL_CLIENT_S_DN'] : "CN=test";
+    $attributes = dn_attributes($dn);
 
-    $saml_response = samlResponse($issuer, $destination, $audience, $requestID, $dn);
+    $saml_response = samlResponse($issuer, $destination, $audience, $requestID, $dn, $attributes);
 
     $cert = file_get_contents(CERTFILE);
     $key = file_get_contents(KEYFILE);
