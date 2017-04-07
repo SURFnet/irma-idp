@@ -113,7 +113,11 @@ $app->get('/sso', function (Request $request) use ($app) {
     $saml_request = $request->get('SAMLRequest');
     $saml_request = gzinflate(base64_decode($saml_request));
     $dom = new DOMDocument();
-    $dom->loadXML($saml_request); // TODO
+    // make sure external entities are disabled
+    $previous = libxml_disable_entity_loader(true);
+    $dom->loadXML($saml_request);
+    libxml_disable_entity_loader($previous);
+    
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('samlp', "urn:oasis:names:tc:SAML:2.0:protocol" );
     $xpath->registerNamespace('saml', "urn:oasis:names:tc:SAML:2.0:assertion" );
