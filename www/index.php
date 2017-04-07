@@ -53,18 +53,11 @@ function samlResponse($issuer, $destination, $audience, $requestID, $dn, $attrib
     ));
 }
 
-function utils_xml_create($xml, $preserveWhiteSpace = FALSE) {
-        $dom = new DOMDocument();
-        $dom->preserveWhiteSpace = $preserveWhiteSpace;
-        $dom->loadXML($xml);
-        $dom->formatOutput = TRUE;
-        return $dom;
-}
-
-function utils_xml_sign($dom, $key, $cert = false)
-{
-    // remove whitespace without breaking signature
-    $dom = utils_xml_create($dom->saveXML(), TRUE);
+function sign($response, $key, $cert) {
+    $dom = new DOMDocument();
+    $dom->preserveWhiteSpace = TRUE;
+    $dom->loadXML($response);
+    $dom->formatOutput = TRUE;
     $dsig = new XMLSecurityDSig();
     $dsig->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);
     $root = $dom->getElementsByTagName('Assertion')->item(0);
@@ -80,10 +73,10 @@ function utils_xml_sign($dom, $key, $cert = false)
     if ($cert)
         $dsig->add509Cert($cert, TRUE);
     $dsig->insertSignature($insert_into, $insert_before);
-    return $dom;
+    return $dom->saveXML();
 }
 
-$app = new Silex\Application(); 
+$app = new Silex\Application();
 $app['debug'] = true;
 
 $app->register(new Silex\Provider\SessionServiceProvider());
@@ -166,14 +159,8 @@ $app->get('/sso', function (Request $request) use ($app) {
 
     $cert = file_get_contents(CERTFILE);
     $key = file_get_contents(KEYFILE);
-    if( $key ) {
-        $dom = new DOMDocument();
-        $dom->preserveWhiteSpace = FALSE;
-        $dom->loadXML($saml_response);
-        $dom->formatOutput = TRUE;
-        $dom = utils_xml_sign($dom, $key, $cert);
-        $saml_response = $dom->saveXML();
-    }
+    if( $key )
+        $saml_response = sign($saml_response, $key, $cert);
 
     $server = parse_url($acs_url, PHP_URL_HOST);
     // TODO validate server
