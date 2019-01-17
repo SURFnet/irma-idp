@@ -61,10 +61,10 @@ function sign($response, $key, $cert) {
     assert('$root instanceof DOMElement');
     $insert_into = $dom->getElementsByTagName('Assertion')->item(0);
     $insert_before = $insert_into->getElementsByTagName('Subject')->item(0);
-    $dsig->addReferenceList(array($root), XMLSecurityDSig::SHA1,
+    $dsig->addReferenceList(array($root), XMLSecurityDSig::SHA256,
         array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N),
         array('id_name' => 'ID'));
-    $objKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA1, array('type' => 'private'));
+    $objKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA256, array('type' => 'private'));
     $objKey->loadKey($key);
     $dsig->sign($objKey);
     if ($cert)
