@@ -1,22 +1,4 @@
-*.tar
 *.pem
 *.key
 *.crt
-
-### Ansible ###
-ansible/playbook.retry 
-
-# Created by https://www.gitignore.io/api/vagrant,composer,jetbrains
-
-### Composer ###
-composer.phar
 /vendor/
-
-### JetBrains ###
-.idea
-
-### Vagrant ###
-.vagrant/
-ubuntu-xenial-16.04-cloudimg-console.log
-
-# End of https://www.gitignore.io/api/vagrant,composer,jetbrains
