@@ -3,28 +3,20 @@ require_once __DIR__.'/../vendor/autoload.php';
 
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use \Firebase\JWT\JWT;
 
+// NOTE that DEBUG is dangerous as unsanitised input may be rendered
 define("DEBUG", false);
 define("KEYFILE", "../key.pem");
 define("CERTFILE", "../cert.pem");      // PEM encoded version
 define("CERTFILE_DER", "../cert.crt"); // DER encoded version
 
-define("NAMEIDFORMAT", "urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName");
-define("AUTHNCONTEXTCLASSREF", "urn:oasis:names:tc:SAML:2.0:ac:classes:X509");
+define("NAMEIDFORMAT", "urn:oasis:names:tc:SAML:2.0:nameid-format:transient");
+define("AUTHNCONTEXTCLASSREF", "urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified");
 
 date_default_timezone_set('UTC');
 
-function dn_attributes($dn) {
-    $attributes = array();
-    foreach( explode(',',$dn) as $pair ) {
-	    if( $pair=='' ) continue;
-        list($k, $v) = explode('=',$pair);
-        $attributes[$k] = $v;
-    }
-    return $attributes;
-}
-
-function samlResponse($issuer, $destination, $audience, $requestID, $dn, $attributes) {
+function samlResponse($issuer, $destination, $audience, $requestID, $nameid, $attributes) {
     $id = "_"; for ($i = 0; $i < 42; $i++ ) $id .= dechex( rand(0,15) );
     $now = gmdate("Y-m-d\TH:i:s\Z", time());
     $notonorafter = gmdate("Y-m-d\TH:i:s\Z", time() + 60 * 5);
@@ -44,7 +36,7 @@ function samlResponse($issuer, $destination, $audience, $requestID, $dn, $attrib
         'NotBefore'	=> $notbefore,
         'NotOnOrAfter'	=> $notonorafter,
         'NameIDFormat' => NAMEIDFORMAT,
-        'Subject'	=> $dn,
+        'Subject'	=> $nameid,
         'AuthnContextClassRef' => AUTHNCONTEXTCLASSREF,
         'attributes'	=> $attributes,
     ));
@@ -108,6 +100,54 @@ $app->get('/metadata', function (Request $request) use ($app) {
 $app->get('/sso', function (Request $request) use ($app) {
     $relay_state = $request->get('RelayState'); // TODO sanitize
     $saml_request = $request->get('SAMLRequest');
+
+    $requestor = new \IRMA\Requestor("IRMA Identity Provider", "irma-idp", "../jwt_key.pem");
+    $jwt = $requestor->getVerificationJwt([
+	[
+		"label" => "Over 18",
+		"attributes" => [ "irma-demo.MijnOverheid.ageLower.over18" ]
+	]
+    ]);
+
+    $post_opts = array('http' =>
+      array(
+        'method'  => 'POST',
+        'content' => $jwt,
+        'header'  => [
+          "Content-Type: text/plain", # as required by irmago
+        ]
+      )
+    );
+
+    $url = 'https://irmago.surfconext.nl/irmaserver/session';
+    $session = file_get_contents($url, false, stream_context_create($post_opts));
+    return $app['twig']->render('disclose.html', [
+        'RelayState'  => $relay_state,
+        'SAMLRequest' => $saml_request,
+        'session'     => $session,
+    ]);
+});
+
+$app->post('/response', function (Request $request) use ($app) {
+    $relay_state = $request->get('RelayState'); // TODO sanitize
+    $saml_request = $request->get('SAMLRequest');
+    $token = $request->get('token');
+
+    $result_jwt = file_get_contents("https://irmago.surfconext.nl/irmaserver/session/$token/result-jwt");
+    $pubkeyfile = 'pubkey.pem';
+    $pubkey = openssl_pkey_get_public("file://$pubkeyfile");
+    $decoded = (array) JWT::decode($result_jwt,$pubkey,array('RS256'));
+    error_log( print_r($decoded,true) );
+
+    if( $decoded['proofStatus'] === 'VALID')
+      error_log( json_encode($decoded['disclosed']) );
+
+    $disclosed = $decoded['disclosed'];
+    $attributes = [];
+    foreach( $disclosed as $d) {
+        $a = (array) $d;
+        $attributes[$a["id"]] = $a["rawvalue"];
+    }
     $saml_request = gzinflate(base64_decode($saml_request));
     $dom = new DOMDocument();
     // make sure external entities are disabled
@@ -141,7 +181,7 @@ $app->get('/sso', function (Request $request) use ($app) {
     if (!$audience) {
         throw new Exception('Could not locate Issuer element.');
     }
-    if( $audience != filter_var($audience, FILTER_VALIDATE_URL))
+    if( $audience != filter_var($audience, FILTER_SANITIZE_STRING)) // was: FILTER_VALIDATE_URL but some SPs violate the spec
         throw new Exception(sprintf("illegal issuer  '%s'", $audience));
 
     # send SAML response
@@ -150,12 +190,8 @@ $app->get('/sso', function (Request $request) use ($app) {
     # remote SP
     $destination = $acs_url;
 
-    $dn = isset($_SERVER['SSL_CLIENT_S_DN']) ? $_SERVER['SSL_CLIENT_S_DN'] : "CN=test";
-    $attributes = dn_attributes($dn);
-    if( array_key_exists('SSL_CLIENT_SAN_Email_0', $_SERVER) )
-        $attributes['mail'] = $_SERVER['SSL_CLIENT_SAN_Email_0'];
-
-    $saml_response = samlResponse($issuer, $destination, $audience, $requestID, $dn, $attributes);
+    $nameid = "_"; for ($i = 0; $i < 20; $i++ ) $nameid .= dechex( rand(0,15) );
+    $saml_response = samlResponse($issuer, $destination, $audience, $requestID, $nameid, $attributes);
 
     $cert = file_get_contents(CERTFILE);
     $key = file_get_contents(KEYFILE);
@@ -171,4 +207,4 @@ $app->get('/sso', function (Request $request) use ($app) {
     ));
 });
 
-$app->run(); 
+$app->run();

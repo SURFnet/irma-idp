@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>IRMA attribute verification</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="irma.js" defer></script>
+    <script type="text/javascript">
+
+      // UI handling functions
+      function clearOutput() {
+        const e = document.getElementById('result');
+        e.setAttribute('hidden', 'true');
+        e.classList.remove('succes', 'warning', 'error');
+      }
+      function showError(err) {
+        const e = document.getElementById('result');
+        e.removeAttribute('hidden');
+        e.classList.remove('success');
+        if (err === irma.SessionStatus.Cancelled) {
+          e.classList.add('warning');
+          e.innerText = 'Session was aborted';
+        } else {
+          e.classList.add('error');
+          e.innerText = 'Error occurred: ' + String(err);
+        }
+        throw err;
+      }
+      function showSuccess(text) {
+        const e = document.getElementById('result');
+        e.innerHTML = text;
+        e.removeAttribute('hidden');
+        e.classList.add('success');
+      }
+
+      function doVerificationSession() {
+
+        clearOutput();
+        showSuccess('Starting...');
+
+        const server = 'https://irmago.surfconext.nl/irmaserver';
+        const session = {{session | raw }};
+        const sessionPtr = session.sessionPtr;
+        const token = session.token;
+
+        return irma.handleSession(session.sessionPtr, {server: server, token: session.token, method: 'popup', language: 'en'})
+          .then(function(result) {
+            document.getElementById("discloseForm").elements.namedItem("token").value = token;
+            document.getElementById("discloseForm").submit();
+          })
+          .catch(function(err) { showError(err); });
+      }
+
+      window.onload = function() {
+        document.getElementById('verification').addEventListener('click', doVerificationSession);
+      };
+    </script>
+  </head>
+  <body>
+        
+    <div id="container">
+      <h1>IRMA attribute verification</h1>
+
+      <div id="result" class="status" hidden></div>
+      <button id="verification">Verify attribute</button>
+
+      <form id="discloseForm" method="post" action="/response" >
+        <input type="hidden" name="SAMLRequest" value="{{SAMLRequest}}" />
+        {% if RelayState %}
+        <input type="hidden" name="RelayState" value="{{RelayState}}" />
+        {% endif %}
+        <input type="hidden" id="token" name="token" value="" />
+    </form>
+
+    </div>
+    
+  </body>
+</html>

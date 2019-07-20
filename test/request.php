@@ -1,13 +1,13 @@
 <?php
+# See https://sptest.iamshowcase.com/testsp_metadata.xml
 # php test/request.php | xargs curl -sk | xpath '//input[@type="hidden" and @name="SAMLResponse"]/@value' | cut -d= -f2- | xargs | base64 -D | xmllint --format -
 
 # local SP
-$issuer = "http://sp.example.org/";
-$acs_url = "https://httpbin.org/post";
+$issuer = "IAMShowcase";
+$acs_url = "https://sptest.iamshowcase.com/acs";
 
 # remote IDP
 $sso_url = "http://localhost:8080/sso";
-$sso_url = "https://localhost:8443/sso";
 
 $now = gmdate("Y-m-d\TH:i:s\Z", time());
 $id = "_"; for ($i = 0; $i < 42; $i++ ) $id .= dechex( rand(0,15) );
