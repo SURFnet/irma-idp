@@ -101,13 +101,36 @@ $app->get('/sso', function (Request $request) use ($app) {
     $relay_state = $request->get('RelayState'); // TODO sanitize
     $saml_request = $request->get('SAMLRequest');
 
-    $requestor = new \IRMA\Requestor("IRMA Identity Provider", "irma-idp", "../jwt_key.pem");
-    $jwt = $requestor->getVerificationJwt([
-	[
-		"label" => "Over 18",
-		"attributes" => [ "irma-demo.MijnOverheid.ageLower.over18" ]
-	]
-    ]);
+    $request = [
+        "iat" => time(),
+        "iss" => 'irma-idp',
+        "sub" => "verification_request",
+        "sprequest" => [
+            "validity" => 60,
+            "request" => [
+                'type' => 'disclosing',
+                'content' => [
+                    [
+                        'label' => '18+',
+                        'attributes' => [ 'irma-demo.MijnOverheid.ageLower.over18' ],
+                    ]
+                ]
+            ]
+        ]
+    ];
+    $pk = openssl_pkey_get_private("file://" . realpath('../jwt_key.pem'));
+    $jwt = JWT::encode($request, $pk, "RS256", 'irma-idp');
+    error_log($jwt);
+
+
+    // $requestor = new \IRMA\Requestor("IRMA Identity Provider", "irma-idp", "../jwt_key.pem");
+    // $jwt = $requestor->getVerificationJwt([
+	// [
+	// 	"label" => "Over 18",
+	// 	"attributes" => [ "irma-demo.MijnOverheid.ageLower.over18" ]
+	// ]
+    // ]);
+    // error_log($jwt);
 
     $post_opts = array('http' =>
       array(

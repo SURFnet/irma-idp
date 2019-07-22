@@ -40,7 +40,24 @@ By default, SAML assertions are unsigned. SAML Service Provicers will not trust 
 Also generate a DER-encoded version of this certificate (included in metadata):
 
 	$ openssl x509 -in cert.pem -outform der -out cert.crt
-	
+
+## IRMA JWT keys
+
+For signing disclosing requests with JWT, an RSA key is required:
+
+	$ openssl genrsa -out jwt_key.pem 2048
+
+The corresponding public key can be extracted for exchange with the IRMA server:
+
+	$ openssl rsa -pubout -in jwt_key.pem -out jwt_pubkey.pem
+
+Also, to verify JWT responses, the public key of the IRMA server needs to be stored in a file `pubkey.pem`
+
+	$ curl https://irmago.surfconext.nl/irmaserver/publickey > www/pubkey.pem
+
+You should verify this key out of band in a production setting:
+
+	$ openssl rsa -in www/pubkey.pem -pubin -noout -modulus
 
 # Updates
 
