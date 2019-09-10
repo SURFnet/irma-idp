@@ -26,8 +26,8 @@
 <div class="container">
     <h2>Attribute Release</h2>
     <p>
-        The following information will be sent to <b>{{ server }}</b>
-        <a href="https://www.whois.com/whois/{{ server }}" class="btn" role="button">&#9432;</a>
+        The following information will be sent to <b>{{ server | e }}</b>
+        <a href="https://www.whois.com/whois/{{ server | e('url') }}" class="btn" role="button">&#9432;</a>
     </p>
     <table class="table">
         <thead>
@@ -46,10 +46,10 @@
         </tbody>
     </table>
 
-    <form method="post" action="{{action}}" >
-        <input type="hidden" name="SAMLResponse" value="{{SAMLResponse}}" />
+    <form method="post" action="{{ action | e('html_attr') }}" >
+        <input type="hidden" name="SAMLResponse" value="{{ SAMLResponse | e('html_attr') }}" />
         {% if RelayState %}
-        <input type="hidden" name="RelayState" value="{{RelayState}}" />
+        <input type="hidden" name="RelayState" value="{{ RelayState | e('html_attr') }}" />
         {% endif %}
         <input type="submit" class="btn btn-info" value="Login"/>
     </form>

@@ -1,12 +1,11 @@
+#!/usr/bin/env php
 <?php
+# generate IdP-initiated (unsollicited) SAML 2.0 Authentication Request
 # See https://sptest.iamshowcase.com/testsp_metadata.xml
-# php test/request.php | xargs curl -sk | xpath '//input[@type="hidden" and @name="SAMLResponse"]/@value' | cut -d= -f2- | xargs | base64 -D | xmllint --format -
-
-# local SP
 $issuer = "IAMShowcase";
 $acs_url = "https://sptest.iamshowcase.com/acs";
 
-# remote IDP
+# this IDP's SSO URL
 $sso_url = "http://localhost:8080/sso";
 
 $now = gmdate("Y-m-d\TH:i:s\Z", time());
