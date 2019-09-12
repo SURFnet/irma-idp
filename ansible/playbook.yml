@@ -5,7 +5,7 @@
   gather_facts: False
 
   vars:
-    docroot: /opt/x509tosaml/www
+    docroot: /opt/irma2saml/www
 
   remote_user: vagrant
 
@@ -15,6 +15,7 @@
 
   - name: install apache and modules
     apt: name={{ item }} update_cache=yes state=latest
+    #name: ['ntp', 'apache2', 'libapache2-mod-php', 'php-dom']
     with_items:
       - ntp
       - apache2
