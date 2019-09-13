@@ -77,12 +77,12 @@ $app->get('/', function (Request $request, Response $response, $args) {
     return $response;
 });
 
-$app->get('/metadata', function (Request $request, Response $response, $args) {
+$app->get('/metadata', function (Request $request, Response $response, $args) use ($twig) {
     $der = file_get_contents(CERTFILE_DER);
     $metadata = $twig->render('metadata.xml', [
        'entityID' => $request->getUri()->withPath('metadata'), // convention: use metadata URL as entity ID
        'Location' => $request->getUri()->withPath('sso'),
-        'X509Certificate' => $contents ? base64_encode($der) : null,
+       'X509Certificate' => $der ? base64_encode($der) : null,
     ]);
     $response->getBody()->write($metadata);
     return $response->withHeader('Content-type', 'text/xml');

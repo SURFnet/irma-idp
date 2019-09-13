@@ -1,4 +1,4 @@
-<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="{{ entityID | e('html_attr') }}">
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="{{ entityID }}">
     <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
         {% if X509Certificate %}
         <KeyDescriptor use="signing">
@@ -9,6 +9,6 @@
             </ds:KeyInfo>
         </KeyDescriptor>
         {% endif %}
-        <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="{{ Location | e('html_attr') }}"/>
+        <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="{{ Location }}"/>
     </IDPSSODescriptor>
 </EntityDescriptor>
