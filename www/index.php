@@ -17,6 +17,19 @@ define("AUTHNCONTEXTCLASSREF", "urn:oasis:names:tc:SAML:2.0:ac:classes:unspecifi
 
 date_default_timezone_set('UTC');
 
+$sps = [
+    'https://surfdrive.surf.nl/' => [
+        'map' => [
+            'pbdf.surf.surfdrive.eppn' => 'urn:mace:dir:attribute-def:eduPersonPrincipalName',
+            'pbdf.surf.surfdrive.emailadres' => 'urn:mace:dir:attribute-def:mail',
+            'pbdf.surf.surfdrive.displayname' => 'urn:mace:dir:attribute-def:displayName',
+        ],
+        'add' => [ 
+            'urn:mace:dir:attribute-def:eduPersonEntitlement' => 'urn:x-surfnet:surf.nl:surfdrive:quota:100'
+            ]
+    ]
+];
+
 function samlResponse($issuer, $destination, $audience, $requestID, $nameid, $attributes) {
     global $twig;
     $id = "_"; for ($i = 0; $i < 42; $i++ ) $id .= dechex( rand(0,15) );
@@ -71,6 +84,11 @@ $twig = new \Twig\Environment($loader, [
     // 'cache' => '/tmp',
 ]);
 
+$config = [
+    'sps' => $sps,
+    'twig' => $twig,
+];
+
 $app->get('/', function (Request $request, Response $response, $args) {
     $url = $request->getUri()->withPath('metadata');
     $response->getBody()->write("This is a SAML IDP<br/>See also the SAML 2.0 <a href='$url'>Metadata</a>");
@@ -106,9 +124,17 @@ $app->get('/sso', function (Request $request, Response $response, $args) use ($t
                 'type' => 'disclosing',
                 'content' => [
                     [
-                        'label' => '18+',
-                        'attributes' => [ 'irma-demo.MijnOverheid.ageLower.over18' ],
-                    ]
+                        'label' => 'eppn',
+                        'attributes' => [ 'pbdf.surf.surfdrive.eppn' ],
+                    ],
+                    [
+                        'label' => 'email',
+                        'attributes' => [ 'pbdf.surf.surfdrive.emailadres' ],
+                    ],
+                    [
+                        'label' => 'displayname',
+                        'attributes' => [ 'pbdf.surf.surfdrive.displayname' ],
+                    ],
                 ]
             ]
         ]
@@ -149,7 +175,7 @@ $app->get('/sso', function (Request $request, Response $response, $args) use ($t
     return $response;
 });
 
-$app->post('/response', function (Request $request, Response $response, $args) use ($twig) {
+$app->post('/response', function (Request $request, Response $response, $args) use ($config) {
     $params = $request->getParsedBody();
     $relay_state = $params['RelayState']; // opaque string, handle with care, needs escaping
     $saml_request = $params['SAMLRequest'];
@@ -174,6 +200,16 @@ $app->post('/response', function (Request $request, Response $response, $args) u
         $a = (array) $d;
         $attributes[$a["id"]] = $a["rawvalue"];
     }
+
+    // map attributes
+    $map = $config['sps']['https://surfdrive.surf.nl/']['map'];
+    $a = $config['sps']['https://surfdrive.surf.nl/']['add'];
+    foreach ($attributes as $key => $value) {
+        if( array_key_exists($key, $map)) {
+            $a[$map[$key]] = $value;
+        }
+    }
+    $attributes = $a;
 
     $saml_request = gzinflate(base64_decode($saml_request));
     $dom = new DOMDocument();
@@ -224,7 +260,7 @@ $app->post('/response', function (Request $request, Response $response, $args) u
     if( $key )
         $saml_response = sign($saml_response, $key, $cert);
         
-    $x = $twig->render('form.html', [
+    $x = $config['twig']->render('form.html', [
         'RelayState'   => $relay_state,
         'SAMLResponse' => base64_encode($saml_response),
         'action'       => $acs_url,
