@@ -48,7 +48,7 @@ function samlResponse($issuer, $destination, $audience, $requestID, $nameid, $at
         'NotBefore'            => $notbefore,
         'NotOnOrAfter'         => $notonorafter,
         'NameIDFormat'         => NAMEIDFORMAT,
-        'Subject'              => $nameid,
+        'NameID'              => $nameid,
         'AuthnContextClassRef' => AUTHNCONTEXTCLASSREF,
         'attributes'           => $attributes,
     ));

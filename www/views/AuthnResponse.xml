@@ -11,10 +11,10 @@
  <samlp:Status xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
   <samlp:StatusCode xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
  </samlp:Status>
- <saml:Assertion Version="2.0" ID="{{ Assertionid | e('html_attr') }}" IssueInstant="{{ IssueInstant | e('html_attr') }}">
+ <saml:Assertion Version="2.0" ID="{{ Assertionid | e('html_attr') }}" IssueInstant="{{ IssueInstant }}">
   <saml:Issuer>{{ Issuer | e}}</saml:Issuer>
    <saml:Subject>
-    <saml:NameID Format='{{ NameIDFormat | e('html_attr')}}'>{{ NameID | e}}</saml:NameID>
+    <saml:NameID Format='{{ NameIDFormat | raw}}'>{{ NameID | raw}}</saml:NameID>
     <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
      <saml:SubjectConfirmationData NotOnOrAfter="{{ NotOnOrAfter | e('html_attr')}}" InResponseTo="{{ InResponseTo | e('html_attr') }}" Recipient="{{ Destination | e('html_attr') }}" /></saml:SubjectConfirmation>
    </saml:Subject>
