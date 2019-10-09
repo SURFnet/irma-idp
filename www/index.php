@@ -253,7 +253,9 @@ $app->post('/response', function (Request $request, Response $response, $args) u
     $destination = $acs_url;
 
     $nameid = "_"; for ($i = 0; $i < 20; $i++ ) $nameid .= dechex( rand(0,15) );
+    error_log(">>>>>>>>>>>>>" . $nameid);
     $saml_response = samlResponse($issuer, $destination, $audience, $requestID, $nameid, $attributes);
+    error_log($saml_response);
 
     $cert = file_get_contents(CERTFILE);
     $key = file_get_contents(KEYFILE);

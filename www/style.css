@@ -17,6 +17,16 @@ h2, h3 {
   margin-top: 2em;
 }
 
+#logo {
+  position: absolute;
+  right: 20px;
+  top: 0px;
+}
+
+#logo img {
+  width: 200px;
+}
+
 #container {
   margin: 50px auto;
   max-width: 600px;
