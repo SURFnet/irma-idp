@@ -25,7 +25,7 @@ $sps = [
             'pbdf.surf.surfdrive.displayname' => 'urn:mace:dir:attribute-def:displayName',
         ],
         'add' => [ 
-            'urn:mace:dir:attribute-def:eduPersonEntitlement' => 'urn:x-surfnet:surf.nl:surfdrive:quota:100'
+            'urn:mace:dir:attribute-def:eduPersonEntitlement' => 'urn:x-surfnet:surf.nl:surfdrive:quota:100',
             ]
     ]
 ];
@@ -209,7 +209,14 @@ $app->post('/response', function (Request $request, Response $response, $args) u
             $a[$map[$key]] = $value;
         }
     }
+    // hack
+    if( array_key_exists('pbdf.surf.surfdrive.eppn', $attributes) ) {
+        list($uid, $sho) = explode('@', $attributes['pbdf.surf.surfdrive.eppn']);
+        if( isset($sho) ) $a['urn:mace:terena.org:attribute-def:schacHomeOrganization'] = $sho; // 'pilot.irma.surfdrive.nl'
+        if( isset($uid) ) $a['urn:mace:dir:attribute-def:uid'] = $uid;
+    }
     $attributes = $a;
+
 
     $saml_request = gzinflate(base64_decode($saml_request));
     $dom = new DOMDocument();
