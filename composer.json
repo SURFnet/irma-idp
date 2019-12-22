@@ -1,6 +1,6 @@
 {
     "require": {
-        "robrichards/xmlseclibs": "^1.3",
+        "robrichards/xmlseclibs": "^2.1",
         "slim/slim": "^4.2",
         "slim/psr7": "^0.5.0",
         "twig/twig": "^2.0",
