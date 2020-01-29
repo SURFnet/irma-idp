@@ -237,7 +237,6 @@ $app->post('/response', function (Request $request, Response $response, $args) u
 
     if( $acs_url != filter_var($acs_url, FILTER_VALIDATE_URL))
         throw new Exception(sprintf("illegal ACS URL '%s'", $acs_url));
-    $server = parse_url($acs_url, PHP_URL_HOST);
 
     // Request ID
     $query = "string(/samlp:AuthnRequest/@ID)";
@@ -273,8 +272,6 @@ $app->post('/response', function (Request $request, Response $response, $args) u
         'RelayState'   => $relay_state,
         'SAMLResponse' => base64_encode($saml_response),
         'action'       => $acs_url,
-        'server'       => $server,
-        'Attributes'   => $attributes,
     ]);
     $response->getBody()->write($x);
     return $response;
