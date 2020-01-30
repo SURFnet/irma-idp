@@ -74,7 +74,8 @@
       <p align="center"><button id="verification">Login</button></p>
 
       <form id="discloseForm" method="post" action="/response" >
-        <input type="hidden" name="SAMLRequest" value="{{ SAMLRequest | e }}" />
+        <input type="hidden" name="requestID" value="{{ requestID | e }}" />
+        <input type="hidden" name="audience" value="{{ audience | e }}" />
         {% if RelayState %}
         <input type="hidden" name="RelayState" value="{{ RelayState | e('html_attr') }}" />
         {% endif %}

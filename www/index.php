@@ -3,6 +3,8 @@ use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Factory\AppFactory;
 use \Firebase\JWT\JWT;
+use RobRichards\XMLSecLibs\XMLSecurityDSig;
+use RobRichards\XMLSecLibs\XMLSecurityKey;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -19,6 +21,7 @@ date_default_timezone_set('UTC');
 
 $sps = [
     'https://surfdrive.surf.nl/' => [
+        'acs' => 'todo',
         'map' => [
             'pbdf.surf.surfdrive.eppn' => 'urn:mace:dir:attribute-def:eduPersonPrincipalName',
             'pbdf.surf.surfdrive.emailadres' => 'urn:mace:dir:attribute-def:mail',
@@ -27,7 +30,16 @@ $sps = [
         'add' => [ 
             'urn:mace:dir:attribute-def:eduPersonEntitlement' => 'urn:x-surfnet:surf.nl:surfdrive:quota:100',
             ]
-    ]
+        ],
+        'IAMShowcase' => [
+            'acs' => 'https://sptest.iamshowcase.com/acs',
+            'map' => [
+                'pbdf.surf.surfdrive.eppn' => 'PrincipalName',
+                'pbdf.surf.surfdrive.emailadres' => 'mail',
+                'pbdf.surf.surfdrive.displayname' => 'displayName',
+            ],
+            'add' => []
+        ]
 ];
 
 function samlResponse($issuer, $destination, $audience, $requestID, $nameid, $attributes) {
@@ -48,7 +60,7 @@ function samlResponse($issuer, $destination, $audience, $requestID, $nameid, $at
         'NotBefore'            => $notbefore,
         'NotOnOrAfter'         => $notonorafter,
         'NameIDFormat'         => NAMEIDFORMAT,
-        'NameID'              => $nameid,
+        'NameID'               => $nameid,
         'AuthnContextClassRef' => AUTHNCONTEXTCLASSREF,
         'attributes'           => $attributes,
     ));
@@ -75,6 +87,44 @@ function sign($response, $key, $cert) {
         $dsig->add509Cert($cert, TRUE);
     $dsig->insertSignature($insert_into, $insert_before);
     return $dom->saveXML();
+}
+
+function parseAuthnRequest($authn_request) {
+    $request = gzinflate(base64_decode($authn_request));
+    $dom = new DOMDocument();
+    // make sure external entities are disabled
+    $previous = libxml_disable_entity_loader(true);
+    $dom->loadXML($request);
+    libxml_disable_entity_loader($previous);
+
+    $xpath = new DOMXPath($dom);
+    $xpath->registerNamespace('samlp', "urn:oasis:names:tc:SAML:2.0:protocol" );
+    $xpath->registerNamespace('saml', "urn:oasis:names:tc:SAML:2.0:assertion" );
+    // ACS URL
+    $query = "string(/samlp:AuthnRequest/@AssertionConsumerServiceURL)";
+    $acs_url = $xpath->evaluate($query, $dom);
+    if (!$acs_url) {
+      throw new Exception('Could not locate AssertionConsumerServiceURL attribute.');
+    }
+    if( $acs_url != filter_var($acs_url, FILTER_VALIDATE_URL))
+        throw new Exception(sprintf("illegal ACS URL '%s'", $acs_url));
+
+    // Request ID
+    $query = "string(/samlp:AuthnRequest/@ID)";
+    $requestID = $xpath->evaluate($query, $dom);
+    if( FALSE === preg_match("/^[a-zA-Z_][0-9a-zA-Z._-]*$/", $requestID) )
+        throw new Exception(sprintf("illegal ID '%s'", $requestID));
+
+    // Issuer
+    $query = "string(/samlp:AuthnRequest/saml:Issuer)";
+    $issuer = $xpath->evaluate($query, $dom);
+    if (!$issuer) {
+        throw new Exception('Could not locate Issuer element.');
+    }
+    if( $issuer != filter_var($issuer, FILTER_SANITIZE_STRING)) // was: FILTER_VALIDATE_URL but some SPs violate the spec
+        throw new Exception(sprintf("illegal issuer  '%s'", $issuer));
+
+    return ["acs_url" => $acs_url, "requestID" => $requestID, "issuer" => $issuer];
 }
 
 $app = AppFactory::create();
@@ -107,12 +157,17 @@ $app->get('/metadata', function (Request $request, Response $response, $args) us
 });
 
 # receive SAML request - assume HTTP-Redirect binding
-$app->get('/sso', function (Request $request, Response $response, $args) use ($twig) {
+$app->get('/sso', function (Request $request, Response $response, $args) use ($config) {
     $params = $request->getQueryParams();
     $relay_state = $params['RelayState']; // opaque string, handle with care, needs escaping
     $saml_request = $params['SAMLRequest'];
     if( $saml_request != filter_var( $saml_request, FILTER_VALIDATE_REGEXP, [ "options" => [ "regexp" => "/^[a-zA-Z0-9\/+_-]*={0,2}$/" ] ] ) )
         throw new Exception(sprintf("malformed SAMLRequest '%s'", $saml_request));
+    $saml = parseAuthnRequest($saml_request);
+    if( !array_key_exists( $saml['issuer'], $config['sps'] ) )
+        throw new Exception(sprintf("Unknown SP '%s'", $saml['issuer'])); // issuer is a sanitized string/url
+    if( !isset( $saml['acs_url'], $config['sps'][$saml['issuer']]['acs'] ) )
+        throw new Exception(sprintf("Illegal ACS location '%s'", $saml['acs_url'])); // acs_url is a sanitized url
 
     $request = [
         "iat" => time(),
@@ -141,16 +196,6 @@ $app->get('/sso', function (Request $request, Response $response, $args) use ($t
     ];
     $pk = openssl_pkey_get_private("file://" . realpath('../jwt_key.pem'));
     $jwt = JWT::encode($request, $pk, "RS256", 'irma-idp');
-    // error_log($jwt);
-
-    // pending https://github.com/privacybydesign/irma-requestor/pull/1
-    // $requestor = new \IRMA\Requestor("IRMA Identity Provider", "irma-idp", "../jwt_key.pem");
-    // $jwt = $requestor->getVerificationJwt([
-        // [
-        //    "label" => "Over 18",
-        //    "attributes" => [ "irma-demo.MijnOverheid.ageLower.over18" ]
-        // ]
-    // ]);
 
     $post_opts = array('http' =>
       array(
@@ -164,23 +209,31 @@ $app->get('/sso', function (Request $request, Response $response, $args) use ($t
 
     $url = 'https://irmago.surfconext.nl/irmaserver/session';
     $session = file_get_contents($url, false, stream_context_create($post_opts)); // this is trusted external input
-    error_log($session);
+    error_log("IRMA session: " . $session);
     
-    $x = $twig->render('disclose.html', [
+    $disclosePage = $config['twig']->render('disclose.html', [
         'RelayState'  => $relay_state,
-        'SAMLRequest' => $saml_request,
+        'requestID'   => $saml['requestID'],
+        'audience'    => $saml['issuer'],
         'session'     => $session,
     ]);
-    $response->getBody()->write($x);
+    $response->getBody()->write($disclosePage);
     return $response;
 });
 
 $app->post('/response', function (Request $request, Response $response, $args) use ($config) {
     $params = $request->getParsedBody();
+    error_log( print_r($params, true) );
+
     $relay_state = $params['RelayState']; // opaque string, handle with care, needs escaping
-    $saml_request = $params['SAMLRequest'];
-    if( $saml_request != filter_var( $saml_request, FILTER_VALIDATE_REGEXP, [ "options" => [ "regexp" => "/^[a-zA-Z0-9\/+_-]*={0,2}$/" ] ] ) )
-        throw new Exception(sprintf("malformed SAMLRequest '%s'", $saml_request));
+    $requestID = $params['requestID'];
+    if( FALSE === preg_match("/^[a-zA-Z_][0-9a-zA-Z._-]*$/", $requestID) )
+        throw new Exception(sprintf("illegal ID '%s'", $requestID));
+    $audience = $params['audience'];
+    if( !array_key_exists( $audience, $config['sps'] ) )
+        throw new Exception(sprintf("Unknown audience '%s'", $audience)); // audience must be tampered with
+    $sp = $config['sps'][$audience];
+
     $token = $params['token'];
     if( $token != filter_var( $token, FILTER_VALIDATE_REGEXP, [ "options" => [ "regexp" => "/^[a-zA-Z0-9\/+_-]*={0,2}$/" ] ] ) )
         throw new Exception(sprintf("malformed token '%s'", $token));
@@ -202,61 +255,27 @@ $app->post('/response', function (Request $request, Response $response, $args) u
     }
 
     // map attributes
-    $map = $config['sps']['https://surfdrive.surf.nl/']['map'];
-    $a = $config['sps']['https://surfdrive.surf.nl/']['add'];
+    $map = $sp['map'];
+    $a = $sp['add'];
     foreach ($attributes as $key => $value) {
         if( array_key_exists($key, $map)) {
             $a[$map[$key]] = $value;
+        } else {
+            $a[$key] = $value;
         }
     }
     // hack
-    if( array_key_exists('pbdf.surf.surfdrive.eppn', $attributes) ) {
+    if( $audience === 'https://surfdrive.surf.nl/' && array_key_exists('pbdf.surf.surfdrive.eppn', $attributes) ) {
         list($uid, $sho) = explode('@', $attributes['pbdf.surf.surfdrive.eppn']);
         if( isset($sho) ) $a['urn:mace:terena.org:attribute-def:schacHomeOrganization'] = $sho; // 'pilot.irma.surfdrive.nl'
         if( isset($uid) ) $a['urn:mace:dir:attribute-def:uid'] = $uid;
     }
     $attributes = $a;
 
-
-    $saml_request = gzinflate(base64_decode($saml_request));
-    $dom = new DOMDocument();
-    // make sure external entities are disabled
-    $previous = libxml_disable_entity_loader(true);
-    $dom->loadXML($saml_request);
-    libxml_disable_entity_loader($previous);
-
-    $xpath = new DOMXPath($dom);
-    $xpath->registerNamespace('samlp', "urn:oasis:names:tc:SAML:2.0:protocol" );
-    $xpath->registerNamespace('saml', "urn:oasis:names:tc:SAML:2.0:assertion" );
-    // ACS URL
-    $query = "string(/samlp:AuthnRequest/@AssertionConsumerServiceURL)";
-    $acs_url = $xpath->evaluate($query, $dom);
-    if (!$acs_url) {
-      throw new Exception('Could not locate AssertionConsumerServiceURL attribute.');
-    }
-
-    if( $acs_url != filter_var($acs_url, FILTER_VALIDATE_URL))
-        throw new Exception(sprintf("illegal ACS URL '%s'", $acs_url));
-
-    // Request ID
-    $query = "string(/samlp:AuthnRequest/@ID)";
-    $requestID = $xpath->evaluate($query, $dom);
-    if( FALSE === preg_match("/^[a-zA-Z_][0-9a-zA-Z._-]*$/", $requestID) )
-        throw new Exception(sprintf("illegal ID '%s'", $requestID));
-
-    // Audience
-    $query = "string(/samlp:AuthnRequest/saml:Issuer)";
-    $audience = $xpath->evaluate($query, $dom);
-    if (!$audience) {
-        throw new Exception('Could not locate Issuer element.');
-    }
-    if( $audience != filter_var($audience, FILTER_SANITIZE_STRING)) // was: FILTER_VALIDATE_URL but some SPs violate the spec
-        throw new Exception(sprintf("illegal issuer  '%s'", $audience));
-
     # send SAML response
     $issuer = $request->getUri()->withPath('metadata'); // convention: use metadata URL as entity ID
     # remote SP
-    $destination = $acs_url;
+    $destination = $sp['acs'];
 
     $nameid = "_"; for ($i = 0; $i < 20; $i++ ) $nameid .= dechex( rand(0,15) );
     error_log(">>>>>>>>>>>>>" . $nameid);
@@ -271,7 +290,7 @@ $app->post('/response', function (Request $request, Response $response, $args) u
     $x = $config['twig']->render('form.html', [
         'RelayState'   => $relay_state,
         'SAMLResponse' => base64_encode($saml_response),
-        'action'       => $acs_url,
+        'action'       => $destination,
     ]);
     $response->getBody()->write($x);
     return $response;
