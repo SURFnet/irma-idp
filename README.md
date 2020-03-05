@@ -2,10 +2,13 @@
 
 Very simple Identity Provider (IdP) based on IRMA credentials with rudimentary support for SAML 2.0.  IRMA attributes are mapped onto SAML attributes.
 
-This is an Open IdP, meaning that no SAML 2.0 SP metadata registration is necessary. 
+This is an Open IdP, meaning that no SAML 2.0 SP metadata registration is necessary.
 
 Please note that this is not a conforming SAML implementation. It will not work with all SAML software implementations. It has been tested with [simpleSAMLphp](http://simplesamlphp.org).
 
+Also note that this IdP (or IRMA to SAML gateway, if you will) is completely stateless. More specifically there is no state maintained on the server. An attacker may try to exploit this by contructing a CSRF sending an unsollicited response to a SAML SP.
+
+Therefore, you should only connect to SAML SPs requiring responses to match an originating request (by validating the value of the `InResponseTo` attribute).
 
 # Installation
 

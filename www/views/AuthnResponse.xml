@@ -7,14 +7,14 @@
         IssueInstant='{{ IssueInstant | e }}'
         Destination='{{ Destination | e }}'
 >
- <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{{ Issuer | e}}</saml:Issuer>
+ <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">{{ Issuer | e }}</saml:Issuer>
  <samlp:Status xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
   <samlp:StatusCode xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
  </samlp:Status>
- <saml:Assertion Version="2.0" ID="{{ Assertionid | e }}" IssueInstant="{{ IssueInstant }}">
-  <saml:Issuer>{{ Issuer | e}}</saml:Issuer>
+ <saml:Assertion Version="2.0" ID="{{ Assertionid | e }}" IssueInstant="{{ IssueInstant | e}}">
+  <saml:Issuer>{{ Issuer | e }}</saml:Issuer>
    <saml:Subject>
-    <saml:NameID Format='{{ NameIDFormat | raw}}'>{{ NameID | e}}</saml:NameID>
+    <saml:NameID Format='{{ NameIDFormat | e }}'>{{ NameID | e }}</saml:NameID>
     <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
      <saml:SubjectConfirmationData NotOnOrAfter="{{ NotOnOrAfter | e }}" InResponseTo="{{ InResponseTo | e }}" Recipient="{{ Destination | e }}" /></saml:SubjectConfirmation>
    </saml:Subject>
@@ -32,8 +32,8 @@
 
   <saml:AttributeStatement>
   {% for key, value in attributes %}
-   <saml:Attribute Name="{{ key |e }}">
-    <saml:AttributeValue>{{ value |e }}</saml:AttributeValue>
+   <saml:Attribute Name="{{ key | e }}">
+    <saml:AttributeValue>{{ value | e }}</saml:AttributeValue>
    </saml:Attribute>
   {% endfor %}
   </saml:AttributeStatement>
